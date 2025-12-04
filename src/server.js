@@ -7,6 +7,7 @@ const { initTimescale } = require('./db/timescaleClient.js');
 const { angelWebSocketServiceV2 } = require('./services/marketData/angelWebSocket.service.v2.js');
 const { populateRedisFromDB } = require('./services/marketData/movers.service.js');
 const { attachPriceSocket, broadcastPrice } = require('./sockets/index.js');
+const { syncAngelOneTokenList } = require('./script/syncAngelOneTokens.js');
 
 async function startServer() {
   await initTimescale();
@@ -27,6 +28,12 @@ async function startServer() {
     logger.info('[Server] Initializing Redis cache for market movers in background...');
     populateRedisFromDB().catch(err => {
       logger.error('[Server] Failed to populate Redis:', err);
+    });
+
+    // Sync Angel One Token List (runs once per day)
+    logger.info('[Server] Starting Angel One token list sync...');
+    syncAngelOneTokenList().catch(err => {
+      logger.error('[Server] Failed to sync Angel One tokens:', err);
     });
   });
 }
