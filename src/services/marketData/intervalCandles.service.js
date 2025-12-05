@@ -1,5 +1,5 @@
 const { tsClient } = require('../../db/timescaleClient.js');
-
+const { newOhlcQueries } = require('../../queries/new_ohlc.queries.js');
 
 /**
  * Interval Candles Service
@@ -31,24 +31,35 @@ async function getIntervalCandles(symbol, interval, limit = 100) {
     throw new Error(`Invalid interval: ${interval}. Supported: ${Object.keys(INTERVAL_CONFIG).join(', ')}`);
   }
 
-  const query = `
-    SELECT 
-      time_bucket($1::interval, ts) AS time,
-      FIRST(open, ts) AS open,
-      MAX(high) AS high,
-      MIN(low) AS low,
-      LAST(close, ts) AS close,
-      SUM(volume) AS volume
-    FROM candles_ohlc
-    WHERE symbol = $2
-      AND ts >= NOW() - INTERVAL '1 year'
-    GROUP BY time
-    ORDER BY time DESC
-    LIMIT $3
-  `;
-
   try {
-    const result = await tsClient.query(query, [config.bucket, symbol, limit]);
+    let result;
+
+    // Use new tables for 1m and 5m
+    if (interval === '1m') {
+      const query = newOhlcQueries.get1MinCandles(symbol, limit);
+      result = await tsClient.query(query);
+    } else if (interval === '5m') {
+      const query = newOhlcQueries.get5MinCandles(symbol, limit);
+      result = await tsClient.query(query);
+    } else {
+      // Fallback to old table for other intervals (or implement aggregation from 1m/5m)
+      const query = `
+        SELECT 
+          time_bucket($1::interval, ts) AS time,
+          FIRST(open, ts) AS open,
+          MAX(high) AS high,
+          MIN(low) AS low,
+          LAST(close, ts) AS close,
+          SUM(volume) AS volume
+        FROM candles_ohlc
+        WHERE symbol = $2
+          AND ts >= NOW() - INTERVAL '1 year'
+        GROUP BY time
+        ORDER BY time DESC
+        LIMIT $3
+      `;
+      result = await tsClient.query(query, [config.bucket, symbol, limit]);
+    }
 
     // Return in ascending order (oldest to newest)
     return result.rows.reverse().map(row => ({
@@ -72,44 +83,11 @@ async function getIntervalCandles(symbol, interval, limit = 100) {
  * @returns {Promise<number|null>} Previous candle's close price
  */
 async function getPreviousIntervalClose(symbol, interval) {
-  const config = INTERVAL_CONFIG[interval];
-
-  if (!config) {
-    throw new Error(`Invalid interval: ${interval}`);
+  const candles = await getIntervalCandles(symbol, interval, 2);
+  if (candles.length >= 2) {
+    return candles[candles.length - 2].close;
   }
-
-  const query = `
-    SELECT 
-      LAST(close, ts) AS close
-    FROM candles_ohlc
-    WHERE symbol = $1
-      AND ts < (
-        SELECT time_bucket($2::interval, MAX(ts))
-        FROM candles_ohlc
-        WHERE symbol = $1
-      )
-      AND ts >= (
-        SELECT time_bucket($2::interval, MAX(ts)) - $2::interval
-        FROM candles_ohlc
-        WHERE symbol = $1
-      )
-    GROUP BY time_bucket($2::interval, ts)
-    ORDER BY time_bucket($2::interval, ts) DESC
-    LIMIT 1
-  `;
-
-  try {
-    const result = await tsClient.query(query, [symbol, config.bucket]);
-
-    if (result.rows.length > 0) {
-      return parseFloat(result.rows[0].close);
-    }
-
-    return null;
-  } catch (error) {
-    console.error(`Error fetching previous ${interval} close for ${symbol}:`, error);
-    return null;
-  }
+  return null;
 }
 
 /**
@@ -197,6 +175,5 @@ async function getAllIntervalsData(symbol) {
     throw error;
   }
 }
-
 
 module.exports = { getAllIntervalsData, getIntervalCandles, getIntervalData, getPreviousIntervalClose };
