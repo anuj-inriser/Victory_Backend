@@ -3,8 +3,10 @@ const { env } = require('../../config/env.js');
 const { logger } = require('../../config/logger.js');
 const { angelService } = require('../angel.service.js');
 const { redisClient } = require('../../db/redisClient.js');
-const { insertTick } = ('../../models/priceTick.model.js');
-const { realtimeAggregatorService } = require('./realtimeAggregator.service.js');
+const realtimeAggregatorService = require('./realtimeAggregator.service.js');
+
+// Token Map (Loaded from DB)
+let tokenMap = {};
 
 class AngelWebSocketService {
   constructor() {
@@ -16,14 +18,32 @@ class AngelWebSocketService {
     this.lastTickTime = null;
   }
 
-  init(broadcastCallback) {
+  async init(broadcastCallback) {
     this.broadcastCallback = broadcastCallback;
+
+    // Load Token Map from DB
+    try {
+      const TradingModel = require('../../models/trading.model.js');
+      tokenMap = await TradingModel.getTokenMap();
+      logger.info(`[AngelWS-V1] Loaded ${Object.keys(tokenMap).length} tokens from Database.`);
+    } catch (err) {
+      logger.error(`[AngelWS-V1] Failed to load token map: ${err.message}`);
+    }
+
     this.connect();
   }
 
   connect() {
     try {
       const { apiKey, clientCode, feedToken, authToken } = env.angel;
+
+      // Debug: Log what we're getting from env
+      console.log('[AngelWS] Credentials check:', {
+        apiKey: apiKey ? `${apiKey.substring(0, 4)}...` : 'MISSING',
+        clientCode: clientCode ? `${clientCode.substring(0, 4)}...` : 'MISSING',
+        feedToken: feedToken ? `${feedToken.substring(0, 20)}...` : 'MISSING',
+        authToken: authToken ? `${authToken.substring(0, 20)}...` : 'MISSING'
+      });
 
       if (!apiKey || !clientCode || !feedToken || !authToken) {
         logger.error('[AngelWS] Missing credentials for WebSocket connection');
@@ -44,6 +64,7 @@ class AngelWebSocketService {
         clientcode: clientCode,
         feedtoken: feedToken,
       };
+      console.log('[AngelWS] WebSocketV2 config:', JSON.stringify(wsConfig, null, 2));
 
       this.ws = new WebSocketV2(wsConfig);
 
@@ -57,6 +78,10 @@ class AngelWebSocketService {
       });
 
       this.ws.on('tick', (data) => {
+        // Log raw data from Angel to understand the exact structure
+        console.log('[AngelWS] Raw tick payload:', JSON.stringify(data.price, data.symbol, data.last_traded_quantity));
+
+        // Some SmartAPI implementations send an array of ticks; handle both cases
         if (Array.isArray(data)) {
           data.forEach((tick) => this.handleTick(tick));
         } else {
@@ -94,7 +119,7 @@ class AngelWebSocketService {
 
     // Map symbols to tokens
     // Note: HDFCBANK disabled until data is fetched with correct token (1333)
-    const symbols = ['SBIN', 'INFY', 'TCS', 'RELIANCE','HDFCBANK'];
+    const symbols = ['SBIN', 'INFY', 'TCS', 'RELIANCE', 'HDFCBANK'];
     const tokens = symbols.map(s => angelService.getSymbolToken(s));
 
     const jsonReq = {
@@ -116,14 +141,6 @@ class AngelWebSocketService {
     // Angel WS is sending token like '"3045"' (with embedded quotes),
     // so normalize it before lookup.
     const normalizedToken = String(tick.token).replace(/"/g, '');
-
-    const tokenMap = {
-      '3045': 'SBIN',
-      '1594': 'INFY',
-      '11536': 'TCS',
-      '2885': 'RELIANCE',
-      '1333': 'HDFCBANK'
-    };
 
     const symbol = tokenMap[normalizedToken];
     if (!symbol) return;
@@ -163,65 +180,72 @@ class AngelWebSocketService {
 
     // Log with IST time for debugging
     const istTime = new Date(ts.getTime()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-    
+    console.log('[AngelWS] Realtime tick', {
+      token: normalizedToken,
+      symbol,
+      price,
+      utc: ts.toISOString(),
+      ist: istTime
+    });
+
     // Track tick reception
     this.tickCount++;
     this.lastTickTime = ts;
-    
+
     if (this.tickCount % 10 === 0) {
-        logger.info(`[AngelWS] Received ${this.tickCount} ticks. Latest: ${symbol} @ ${price} at ${istTime}`);
-      }
-
-      // Convert OHLC values from paise to rupees and validate
-      const convertAndValidate = (value) => {
-        const num = Number(value);
-        if (isNaN(num) || num <= 0) return null;
-        const converted = num / 100;
-        return (converted >= 1 && converted <= 100000) ? converted : null;
-      };
-
-      const open = convertAndValidate(tick.open_price_day);
-      const high = convertAndValidate(tick.high_price_day);
-      const low = convertAndValidate(tick.low_price_day);
-      const close = convertAndValidate(tick.close_price_day);
-
-      // 1. Save latest price to Redis (High Performance)
-      try {
-        const tickData = {
-          symbol,
-          price,
-          ts: ts.toISOString(),
-          open: open || price,
-          high: high || price,
-          low: low || price,
-          close: close || price,
-          volume: tick.volume_trade_for_day || 0
-        };
-        // Store as simple string for fast retrieval
-        await redisClient.set(`PRICE:LATEST:${symbol}`, JSON.stringify(tickData));
-        
-        // Also publish to a channel if we want to use Redis Pub/Sub later
-        // await redisClient.publish('PRICE_UPDATES', JSON.stringify(tickData));
-      } catch (err) {
-        logger.error(`[AngelWS] Redis Error: ${err.message}`);
-      }
-
-      // 1b. Save tick to DB (for 1s resolution) 
-      // DISABLED FOR PERFORMANCE: We only save aggregated candles now.
-      /*
-      try {
-          // We don't await this to avoid blocking
-        insertTick({ symbol, ts, value: price }).catch(err => logger.error(`DB Insert Error: ${err.message}`));
-    } catch (err) {
-        // ignore
+      logger.info(`[AngelWS] Received ${this.tickCount} ticks. Latest: ${symbol} @ ${price} at ${istTime}`);
     }
-    */
+
+    // Convert OHLC values from paise to rupees and validate
+    const convertAndValidate = (value) => {
+      const num = Number(value);
+      if (isNaN(num) || num <= 0) return null;
+      const converted = num / 100;
+      return (converted >= 1 && converted <= 100000) ? converted : null;
+    };
+
+    const open = convertAndValidate(tick.open_price_day);
+    const high = convertAndValidate(tick.high_price_day);
+    const low = convertAndValidate(tick.low_price_day);
+    const close = convertAndValidate(tick.close_price_day);
+
+    // 1. Save latest price to Redis (High Performance)
+    try {
+      const tickData = {
+        symbol,
+        price,
+        ts: ts.toISOString(),
+        open: open || price,
+        high: high || price,
+        low: low || price,
+        close: close || price,
+        volume: tick.volume_trade_for_day || 0
+      };
+      // Store as simple string for fast retrieval
+      await redisClient.set(`PRICE:LATEST:${symbol}`, JSON.stringify(tickData));
+
+      // Also publish to a channel if we want to use Redis Pub/Sub later
+      // await redisClient.publish('PRICE_UPDATES', JSON.stringify(tickData));
+    } catch (err) {
+      logger.error(`[AngelWS] Redis Error: ${err.message}`);
+    }
+
+    // 1b. Save tick to DB (for 1s resolution) 
+    // DISABLED FOR PERFORMANCE: We only save aggregated candles now.
+    /*
+    try {
+        // We don't await this to avoid blocking
+      insertTick({ symbol, ts, value: price }).catch(err => logger.error(`DB Insert Error: ${err.message}`));
+  } catch (err) {
+      // ignore
+  }
+  */
 
     // 2. Aggregate into 1-minute candles (for 1m+ resolution)
     try {
-        realtimeAggregatorService.onTick(symbol, price, 0, ts);
+      realtimeAggregatorService.onTick(symbol, price, 0, ts);
     } catch (err) {
-        logger.error(`[AngelWS] Aggregation error: ${err.message}`);
+      logger.error(`[AngelWS] Aggregation error: ${err.message}`);
     }
 
     // 3. Broadcast to frontend (only send valid data)
@@ -241,6 +265,4 @@ class AngelWebSocketService {
   }
 }
 
- const angelWebSocketService = new AngelWebSocketService();
-
- module.exports={angelWebSocketService}
+module.exports = new AngelWebSocketService();
