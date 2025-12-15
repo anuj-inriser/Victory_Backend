@@ -220,11 +220,6 @@ app.use(errorHandler);
 // require('./services/autonewsfeedCron');
 // require('./services/insidetradingCron');
 
-// startServer().catch((err) => {
-//     console.error('Failed to start v2 server', err);
-//     process.exit(1);
-// });
-
 const { startSmartApiStream } = require("./services/smartapiStream");
 startSmartApiStream();
 
