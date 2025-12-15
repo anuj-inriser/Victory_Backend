@@ -10,8 +10,10 @@ const { newOhlcQueries } = require('../../queries/new_ohlc.queries.js');
 const INTERVAL_CONFIG = {
   '1m': { bucket: '1 minute', limit: 100 },
   '5m': { bucket: '5 minutes', limit: 100 },
+  '10m': { bucket: '10 minutes', limit: 100 },
   '15m': { bucket: '15 minutes', limit: 100 },
   '1h': { bucket: '1 hour', limit: 100 },
+  '4h': { bucket: '4 hours', limit: 100 },
   '1d': { bucket: '1 day', limit: 100 },
   '1w': { bucket: '1 week', limit: 52 },
   '1M': { bucket: '1 month', limit: 24 }
@@ -34,12 +36,15 @@ async function getIntervalCandles(symbol, interval, limit = 100) {
   try {
     let result;
 
-    // Use new tables for 1m and 5m
+    // Use new tables for 1m and 5m and 10m
     if (interval === '1m') {
       const query = newOhlcQueries.get1MinCandles(symbol, limit);
       result = await tsClient.query(query);
     } else if (interval === '5m') {
       const query = newOhlcQueries.get5MinCandles(symbol, limit);
+      result = await tsClient.query(query);
+    } else if (interval === '10m') {
+      const query = newOhlcQueries.get10MinCandles(symbol, limit);
       result = await tsClient.query(query);
     } else {
       // Fallback to old table for other intervals (or implement aggregation from 1m/5m)
@@ -89,6 +94,7 @@ async function getPreviousIntervalClose(symbol, interval) {
   }
   return null;
 }
+
 
 /**
  * Get complete interval data with LTP and comparison metrics

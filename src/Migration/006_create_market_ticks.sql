@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS market_ticks (
+    id BIGSERIAL PRIMARY KEY,
+    token INTEGER,
+    exchange_type INTEGER,
+    mode INTEGER,
+    ltp DOUBLE PRECISION,
+    open DOUBLE PRECISION,
+    high DOUBLE PRECISION,
+    low DOUBLE PRECISION,
+    close DOUBLE PRECISION,
+    volume BIGINT,
+    total_buy_qty DOUBLE PRECISION,
+    total_sell_qty DOUBLE PRECISION,
+    open_interest DOUBLE PRECISION,
+    upper_circuit DOUBLE PRECISION,
+    lower_circuit DOUBLE PRECISION,
+    week_high DOUBLE PRECISION,
+    week_low DOUBLE PRECISION,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
