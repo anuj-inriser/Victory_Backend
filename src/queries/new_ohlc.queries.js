@@ -99,6 +99,53 @@ const newOhlcQueries = {
   }),
 
   /**
+   * Insert 10-minute candle
+   */
+  insert10MinCandle: (candle) => ({
+    text: `
+      INSERT INTO "10Min_OHLC" ("Symbol", "ExchangeID", "Time", "Open", "High", "Low", "Close", "Volume")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT ("Symbol", "Time") DO UPDATE SET
+        "Open" = EXCLUDED."Open",
+        "High" = EXCLUDED."High",
+        "Low" = EXCLUDED."Low",
+        "Close" = EXCLUDED."Close",
+        "Volume" = EXCLUDED."Volume"
+      RETURNING *
+    `,
+    values: [
+      candle.Symbol,
+      candle.ExchangeID,
+      candle.Time,
+      candle.Open,
+      candle.High,
+      candle.Low,
+      candle.Close,
+      candle.Volume || 0
+    ]
+  }),
+
+  /**
+   * Get 10-minute candles
+   */
+  get10MinCandles: (symbol, limit = 100) => ({
+    text: `
+      SELECT 
+        "Time" as time,
+        "Open" as open,
+        "High" as high,
+        "Low" as low,
+        "Close" as close,
+        "Volume" as volume
+      FROM "10Min_OHLC"
+      WHERE "Symbol" = $1
+      ORDER BY "Time" DESC
+      LIMIT $2
+    `,
+    values: [symbol, limit]
+  }),
+
+  /**
    * Aggregate 1-min candles to create a 5-min candle
    * Used to calculate 5-min candle from DB if needed
    */

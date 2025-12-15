@@ -1,4 +1,4 @@
-
+-- 1Min OHLC
 CREATE TABLE IF NOT EXISTS "1Min_OHLC" (
   "Symbol" TEXT NOT NULL,
   "ExchangeID" TEXT NOT NULL,
@@ -9,14 +9,10 @@ CREATE TABLE IF NOT EXISTS "1Min_OHLC" (
   "Close" DOUBLE PRECISION NOT NULL,
   "Volume" DOUBLE PRECISION DEFAULT 0
 );
-
-
 SELECT create_hypertable('"1Min_OHLC"', 'Time', if_not_exists => TRUE);
-
-
 CREATE UNIQUE INDEX IF NOT EXISTS "idx_1min_symbol_time" ON "1Min_OHLC" ("Symbol", "Time");
 
-
+-- 5Min OHLC
 CREATE TABLE IF NOT EXISTS "5Min_OHLC" (
   "Symbol" TEXT NOT NULL,
   "ExchangeID" TEXT NOT NULL,
@@ -27,9 +23,103 @@ CREATE TABLE IF NOT EXISTS "5Min_OHLC" (
   "Close" DOUBLE PRECISION NOT NULL,
   "Volume" DOUBLE PRECISION DEFAULT 0
 );
-
--- Convert to hypertable
 SELECT create_hypertable('"5Min_OHLC"', 'Time', if_not_exists => TRUE);
-
--- Create unique index
 CREATE UNIQUE INDEX IF NOT EXISTS "idx_5min_symbol_time" ON "5Min_OHLC" ("Symbol", "Time");
+
+-- 10Min OHLC
+CREATE TABLE IF NOT EXISTS "10Min_OHLC" (
+  "Symbol" TEXT NOT NULL,
+  "ExchangeID" TEXT NOT NULL,
+  "Time" TIMESTAMPTZ NOT NULL,
+  "Open" DOUBLE PRECISION NOT NULL,
+  "High" DOUBLE PRECISION NOT NULL,
+  "Low" DOUBLE PRECISION NOT NULL,
+  "Close" DOUBLE PRECISION NOT NULL,
+  "Volume" DOUBLE PRECISION DEFAULT 0
+);
+SELECT create_hypertable('"10Min_OHLC"', 'Time', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_10min_symbol_time" ON "10Min_OHLC" ("Symbol", "Time");
+
+-- 15Min OHLC
+CREATE TABLE IF NOT EXISTS "15Min_OHLC" (
+  "Symbol" TEXT NOT NULL,
+  "ExchangeID" TEXT NOT NULL,
+  "Time" TIMESTAMPTZ NOT NULL,
+  "Open" DOUBLE PRECISION NOT NULL,
+  "High" DOUBLE PRECISION NOT NULL,
+  "Low" DOUBLE PRECISION NOT NULL,
+  "Close" DOUBLE PRECISION NOT NULL,
+  "Volume" DOUBLE PRECISION DEFAULT 0
+);
+SELECT create_hypertable('"15Min_OHLC"', 'Time', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_15min_symbol_time" ON "15Min_OHLC" ("Symbol", "Time");
+
+-- 30Min OHLC
+CREATE TABLE IF NOT EXISTS "30Min_OHLC" (
+  "Symbol" TEXT NOT NULL,
+  "ExchangeID" TEXT NOT NULL,
+  "Time" TIMESTAMPTZ NOT NULL,
+  "Open" DOUBLE PRECISION NOT NULL,
+  "High" DOUBLE PRECISION NOT NULL,
+  "Low" DOUBLE PRECISION NOT NULL,
+  "Close" DOUBLE PRECISION NOT NULL,
+  "Volume" DOUBLE PRECISION DEFAULT 0
+);
+SELECT create_hypertable('"30Min_OHLC"', 'Time', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_30min_symbol_time" ON "30Min_OHLC" ("Symbol", "Time");
+
+-- 1Hour OHLC
+CREATE TABLE IF NOT EXISTS "1Hour_OHLC" (
+  "Symbol" TEXT NOT NULL,
+  "ExchangeID" TEXT NOT NULL,
+  "Time" TIMESTAMPTZ NOT NULL,
+  "Open" DOUBLE PRECISION NOT NULL,
+  "High" DOUBLE PRECISION NOT NULL,
+  "Low" DOUBLE PRECISION NOT NULL,
+  "Close" DOUBLE PRECISION NOT NULL,
+  "Volume" DOUBLE PRECISION DEFAULT 0
+);
+SELECT create_hypertable('"1Hour_OHLC"', 'Time', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_1hour_symbol_time" ON "1Hour_OHLC" ("Symbol", "Time");
+
+-- 4Hour OHLC
+CREATE TABLE IF NOT EXISTS "4Hour_OHLC" (
+  "Symbol" TEXT NOT NULL,
+  "ExchangeID" TEXT NOT NULL,
+  "Time" TIMESTAMPTZ NOT NULL,
+  "Open" DOUBLE PRECISION NOT NULL,
+  "High" DOUBLE PRECISION NOT NULL,
+  "Low" DOUBLE PRECISION NOT NULL,
+  "Close" DOUBLE PRECISION NOT NULL,
+  "Volume" DOUBLE PRECISION DEFAULT 0
+);
+SELECT create_hypertable('"4Hour_OHLC"', 'Time', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_4hour_symbol_time" ON "4Hour_OHLC" ("Symbol", "Time");
+
+-- 1Day OHLC
+CREATE TABLE IF NOT EXISTS "1Day_OHLC" (
+  "Symbol" TEXT NOT NULL,
+  "ExchangeID" TEXT NOT NULL,
+  "Time" TIMESTAMPTZ NOT NULL,
+  "Open" DOUBLE PRECISION NOT NULL,
+  "High" DOUBLE PRECISION NOT NULL,
+  "Low" DOUBLE PRECISION NOT NULL,
+  "Close" DOUBLE PRECISION NOT NULL,
+  "Volume" DOUBLE PRECISION DEFAULT 0
+);
+SELECT create_hypertable('"1Day_OHLC"', 'Time', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_1day_symbol_time" ON "1Day_OHLC" ("Symbol", "Time");
+
+-- 1Week OHLC
+CREATE TABLE IF NOT EXISTS "1Week_OHLC" (
+  "Symbol" TEXT NOT NULL,
+  "ExchangeID" TEXT NOT NULL,
+  "Time" TIMESTAMPTZ NOT NULL,
+  "Open" DOUBLE PRECISION NOT NULL,
+  "High" DOUBLE PRECISION NOT NULL,
+  "Low" DOUBLE PRECISION NOT NULL,
+  "Close" DOUBLE PRECISION NOT NULL,
+  "Volume" DOUBLE PRECISION DEFAULT 0
+);
+SELECT create_hypertable('"1Week_OHLC"', 'Time', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_1week_symbol_time" ON "1Week_OHLC" ("Symbol", "Time");

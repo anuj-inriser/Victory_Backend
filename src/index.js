@@ -5,6 +5,15 @@ const { startServer } = require("./server.js");
 const session = require("express-session");
 const FileStore = require("session-file-store")(session);
 const path = require("path")
+const { createServer } = require("http");
+const { initRedis } = require("./db/redisClient.js");
+const { initTimescale } = require("./db/timescaleClient.js");
+const { angelWebSocketServiceV2 } = require("./services/marketData/angelWebSocket.service.v2.js");
+const { populateRedisFromDB } = require("./services/marketData/movers.service.js");
+const { attachPriceSocket, broadcastPrice } = require("./sockets/index.js");
+const { syncAngelOneTokenList } = require("./script/syncAngelOneTokens.js");
+const { env } = require("./config/env.js");
+const { logger } = require("./config/logger.js");
 require("dotenv").config();
 
 const app = express();
@@ -114,9 +123,12 @@ const intervalsRoutes = require("./routes/intervals.routes.js");
 const indicesRoutes = require("./routes/indices.routes.js");
 const tradingRoutes = require("./routes/trading.routes.js");
 
+
 app.get("/", (req, res) => {
     res.json("Hello from Victory Backend");
 });
+
+
 
 app.use("/api/users", userRoutes);
 app.use("/api/gender", genderRoutes);
@@ -205,23 +217,52 @@ app.use("/api/trading", tradingRoutes);
 
 app.use(errorHandler);
 
-// app.listen(PORT, () => {
-//     console.log(`Server running at port : http://localhost:${PORT}`);
-// });
 // require('./services/autonewsfeedCron');
 // require('./services/insidetradingCron');
 
-startServer().catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error('Failed to start v2 server', err);
-    process.exit(1);
-});
+// startServer().catch((err) => {
+//     console.error('Failed to start v2 server', err);
+//     process.exit(1);
+// });
 
 const { startSmartApiStream } = require("./services/smartapiStream");
 startSmartApiStream();
 
-const HOST = "192.168.1.16";
+// For Server - Admin Pannel & App
+async function bootstrap() {
+    try {
+        // DB Init
+        await initTimescale();
+        await initRedis();
 
-app.listen(PORT, HOST, () => {
-    console.log(`Server running at http://${HOST}:${PORT}`);
-});
+        // Create HTTP Server
+        const server = createServer(app);
+
+        console.log("[Server] Attaching WebSocket server...");
+        attachPriceSocket(server);
+        console.log("[Server] WebSocket server attached");
+
+        // Angel One Live Market Data
+        angelWebSocketServiceV2.init(broadcastPrice);
+
+        server.listen(env.port || PORT, () => {
+            // logger.info(`Backend listening on http://localhost:${env.port || PORT}`);
+            logger.info(`Backend listening on http://192.168.1.18:${env.port || PORT}`);
+
+            // Background jobs
+            populateRedisFromDB().catch(err =>
+                logger.error("Redis populate failed", err)
+            );
+
+            syncAngelOneTokenList().catch(err =>
+                logger.error("Token sync failed", err)
+            );
+        });
+
+    } catch (err) {
+        console.error("❌ Failed to start server", err);
+        process.exit(1);
+    }
+}
+
+bootstrap();
